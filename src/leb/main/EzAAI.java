@@ -1,37 +1,21 @@
 package leb.main;
 
+import leb.process.ProcCDSPredictionByProdigal;
 import leb.process.ProcCalcPairwiseAAI;
 import leb.process.ProcFuncAnnoByMMSeqs2;
 import leb.process.ProcUPGMA;
-import leb.process.ProcCDSPredictionByProdigal;
-import leb.process.ProcParallelProdigal;
 import leb.util.common.ANSIHandler;
 import leb.util.common.Arguments;
 import leb.util.common.Prompt;
 import leb.util.common.Shell;
 import leb.util.config.GenericConfig;
-import leb.util.seq.DnaSeqDomain;
-import leb.util.seq.Seqtools;
-import leb.util.seq.FastSeqLoader;
-
-
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.nio.file.Files;
-import java.util.List;
-import java.util.Random;
-import java.util.Map;
-import java.util.HashMap;
-
 import org.apache.commons.io.FileUtils;
 
-import java.util.ArrayList;
+import java.io.*;
+import java.util.*;
 
 public class EzAAI {
-	public static final String VERSION  = "v1.2.3",
+	public static final String VERSION  = "v1.2.3-HT-modified",
 							   RELEASE  = "Feb. 2024",
 							   CITATION = " Kim, D., Park, S. & Chun, J.\n"
 							   			+ " Introducing EzAAI: a pipeline for high throughput calculations of prokaryotic average amino acid identity.\n"
@@ -360,16 +344,10 @@ public class EzAAI {
 		String  gffFile = tmp + File.separator + GenericConfig.SESSION_UID + ".gff",
 				faaFile = output + File.separator + inputName + File.separator + inputName + ".faa",
 				ffnFile = tmp + File.separator + GenericConfig.SESSION_UID + ".ffn";
-		Prompt.print(gffFile);
-		Prompt.print(faaFile);
-		Prompt.print(ffnFile);
+
 		try {
 			Prompt.print("Running prodigal on genome " + input1 + "...");
-			if(multithread) {
-				ProcParallelProdigal procProdigal = new ProcParallelProdigal(input1, faaFile, tmp + File.separator, path_ufasta, path_prodigal, thread);
-				if(procProdigal.run() < 0) return -1;
-			}
-			else {
+			if (!new File(faaFile).exists()) {
 				ProcCDSPredictionByProdigal procProdigal = new ProcCDSPredictionByProdigal();
 				procProdigal.setOutDir(tmp + File.separator);
 				procProdigal.setProdigalPath(path_prodigal);
@@ -377,6 +355,9 @@ public class EzAAI {
 				procProdigal.setFaaOutFileName(faaFile);
 				procProdigal.setFfnOutFileName(ffnFile);
 				procProdigal.execute(input1, GenericConfig.DEV);
+			}
+			else{
+				Prompt.print("Expected prodigal output already exists, proceeding with conversion.");
 			}
 			Prompt.talk("EzAAI", "Creating a submodule for converting .faa into .db...");
 			EzAAI convertModule = new EzAAI("convert");
@@ -458,7 +439,7 @@ public class EzAAI {
 				} else {
 					// we were given a directory with a database inside
 					if (l.equals("mm.label")) {
-						inames.add(ifile.getAbsolutePath() + File.separator + l);
+						inames.add(ifile.getAbsolutePath());
 						break;
 					}
 				}
@@ -475,30 +456,21 @@ public class EzAAI {
 					assert subdir_list != null;
 					for (String filename : subdir_list) {
 						if (filename.equals("mm.label")) {
-							jnames.add(ifile.getAbsolutePath() + File.separator + l);
+							jnames.add(jfile.getAbsolutePath() + File.separator + l);
 							break;
 						}
 					}
 				} else {
 					// we were given a directory with a database inside
 					if (l.equals("mm.label")) {
-						jnames.add(ifile.getAbsolutePath() + File.separator + l);
+						jnames.add(jfile.getAbsolutePath());
 						break;
 					}
 				}
 
 			}
 
-			String[] inames_array = new String[inames.size()];
-			String[] jnames_array = new String[jnames.size()];
-			for (int i = 0; i < inames_array.length; i++){
-				inames_array[i] = inames.get(i);
-			}
-			for (int j = 0; j < jnames_array.length; j++){
-				jnames_array[j] = jnames.get(j);
-			}
-
-			if(self && inames_array.length <= 1) {
+			if(self && inames.size() <= 1) {
 				Prompt.error("Self-comparison requires directory with at least two files.");
 				return -1;
 			}
@@ -517,7 +489,7 @@ public class EzAAI {
 
 			 */
 
-            for (String s : inames_array) {
+            for (String s : inames) {
 
                 File idir = new File(s);
                 assert idir.isDirectory();
@@ -540,7 +512,7 @@ public class EzAAI {
                 br.close();
                 // (new File("mm.label")).delete();
             }
-			for (String s : jnames_array) {
+			for (String s : jnames) {
 
 				File jdir = new File(s);
 				assert jdir.isDirectory();
