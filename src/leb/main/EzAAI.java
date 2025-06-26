@@ -511,6 +511,7 @@ public class EzAAI {
                 for (String fp : idb_ls) {
                     if (fp.contains(".faa")) {
                         faaPath = s + File.separator + fp;
+						break;
                     }
                 }
                 assert faaPath != null;
@@ -533,6 +534,7 @@ public class EzAAI {
 				for (String fp : jdb_ls) {
 					if (fp.contains(".faa")) {
 						faaPath = s + File.separator + fp;
+						break;
 					}
 				}
 				assert faaPath != null;
