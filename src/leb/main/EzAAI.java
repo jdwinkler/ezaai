@@ -295,6 +295,7 @@ public class EzAAI {
 			bw.close();
 			
 			// create databases
+			// TODO use proper temp file directory creation
 			String dir = tmp + File.separator + hex;
 			if(!(new File(dir)).mkdirs()) {
 				Prompt.error("Failed to create temporary directory: " + dir);
@@ -313,17 +314,22 @@ public class EzAAI {
 			String[] names = {"mm", "mm.dbtype", "mm.index", "mm.lookup", "mm.source", "mm_h", "mm_h.dbtype", "mm_h.index", "mm.label"};
 			
 			// create .db file
-			StringBuilder buf = new StringBuilder("tar -c -z -f " + "mm.tar.gz");
-			for(String name : names) buf.append(" ").append(name);
-			Shell.exec(buf.toString(), new File(dir));
-			Shell.exec("mv " + dir + File.separator + "mm.tar.gz " + output);
+			// StringBuilder buf = new StringBuilder("tar -c -z -f " + "mm.tar.gz");
+			for(String name : names)
+			{
+				// JW modification-just save all of the files without any deletion etc.
+				Shell.exec("mv " + name + " " + output + File.separator + name);
+				// buf.append(" ").append(name);
+			}
+			// Shell.exec(buf.toString(), new File(dir));
+			// Shell.exec("mv " + dir + File.separator + "mm.tar.gz " + output);
 			
 			// remove temporary files
-			for(String name : names) (new File(dir + File.separator + name)).delete();
-			(new File(dir)).delete();
+			// for(String name : names) (new File(dir + File.separator + name)).delete();
+			// (new File(dir)).delete();
 			
 			// tidy up
-			(new File(faaPath)).delete();
+			// (new File(faaPath)).delete();
 			
 		} catch(Exception e) {
 			e.printStackTrace();
@@ -338,7 +344,7 @@ public class EzAAI {
 	private int runExtract() {
 		Prompt.debug("EzAAI - extract module");
 		String  gffFile = tmp + File.separator + GenericConfig.SESSION_UID + ".gff",
-				faaFile = input1 + ".faa",
+				faaFile = output + File.separator + input1 + ".faa",
 				ffnFile = tmp + File.separator + GenericConfig.SESSION_UID + ".ffn";
 		
 		try {
@@ -362,7 +368,7 @@ public class EzAAI {
 			if(convertModule.run(convertArgs) < 0) return -1;
 			
 			(new File(gffFile)).delete();
-			(new File(faaFile)).delete();
+			// (new File(faaFile)).delete();
 			(new File(ffnFile)).delete();
 			
 		} catch(Exception e) {
@@ -391,6 +397,11 @@ public class EzAAI {
 	
 	private int runCalculate() {
 		Prompt.debug("EzAAI - calculate module");
+
+		// basically, since we are just going to store the results in a single directory per genome
+		// we need to change this function to check each subfolder for the requisite mm.label / faa files
+		// and then not delete its prior output constantly
+		// then we should be able to run in parallel, I think.
 		
 		try {
 			// check output file format
@@ -769,7 +780,7 @@ public class EzAAI {
 			System.out.println(ANSIHandler.wrapper("\n Required options", 'Y'));
 			System.out.println(ANSIHandler.wrapper(String.format(" %-"+indent+"s%s", "Argument", "Description"), 'c'));
 			System.out.printf(" %-"+indent+"s%s%n", "-i", "Input prokaryotic genome sequence");
-			System.out.printf(" %-"+indent+"s%s%n", "-o", "Output protein database");
+			System.out.printf(" %-"+indent+"s%s%n", "-o", "Output protein database folder");
 			
 			System.out.println();
 			
