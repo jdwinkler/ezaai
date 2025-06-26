@@ -13,10 +13,11 @@ import org.apache.commons.io.FileUtils;
 
 import java.io.*;
 import java.util.*;
+import java.lang.System;
 
 public class EzAAI {
 	public static final String VERSION  = "v1.2.3-HT-modified",
-							   RELEASE  = "Feb. 2024",
+							   RELEASE  = "June 2025",
 							   CITATION = " Kim, D., Park, S. & Chun, J.\n"
 							   			+ " Introducing EzAAI: a pipeline for high throughput calculations of prokaryotic average amino acid identity.\n"
 							   			+ " J Microbiol. 59, 476–480 (2021).\n"
@@ -415,30 +416,26 @@ public class EzAAI {
 			}
 			// prepare profiles
 			File ifile = new File(input1), jfile = new File(input2);
-			ArrayList<String> inames, jnames;
+			ArrayList<String> inames = new ArrayList<String>(); ArrayList<String> jnames = new ArrayList<String>();
 			assert ifile.isDirectory();
 			assert jfile.isDirectory();
 			String[] ls = ifile.list();
 			assert ls != null;
-			inames = new ArrayList<String>();
-			for (String l : ls) {
+			for (String file_list_item : ls) {
 				// algo change: we only want directories with the mm.label file inside
 				// this allows us to avoid weird file access / race conditions.
+				// No need to move files to a separate directory.
 
-				File idir = new File(ifile + File.separator + l);
+				File idir = new File(ifile + File.separator + file_list_item);
 				if (idir.isDirectory()) {
 					// we were given a directory with a set of directories containing databases
-					String[] subdir_list = idir.list();
-					assert subdir_list != null;
-					for (String filename : subdir_list) {
-						if (filename.equals("mm.label")) {
-							inames.add(ifile.getAbsolutePath() + File.separator + l);
-							break;
-						}
+					// we then check to see if we find the mm.label file and add the filepath to inames otherwise
+					if (new File(ifile + File.separator + file_list_item + File.separator + "mm.label").exists()) {
+						inames.add(ifile.getAbsolutePath() + File.separator + file_list_item);
 					}
 				} else {
 					// we were given a directory with a database inside
-					if (l.equals("mm.label")) {
+					if (file_list_item.equals("mm.label")) {
 						inames.add(ifile.getAbsolutePath());
 						break;
 					}
@@ -447,29 +444,23 @@ public class EzAAI {
 			String[] jls = jfile.list();
 			assert jls != null;
 			jnames = new ArrayList<String>();
-			for (String l : jls) {
+			for (String file_list_item : jls) {
 
-				File jdir = new File(jfile + File.separator + l);
+				File jdir = new File(jfile + File.separator + file_list_item);
 				if (jdir.isDirectory()) {
 					// we were given a directory with a set of directories containing databases
-					String[] subdir_list = jdir.list();
-					assert subdir_list != null;
-					for (String filename : subdir_list) {
-						if (filename.equals("mm.label")) {
-							jnames.add(jfile.getAbsolutePath() + File.separator + l);
-							break;
-						}
+					if (new File(jfile + File.separator + file_list_item + File.separator + "mm.label").exists()) {
+						jnames.add(jfile.getAbsolutePath() + File.separator + file_list_item);
 					}
+
 				} else {
 					// we were given a directory with a database inside
-					if (l.equals("mm.label")) {
+					if (file_list_item.equals("mm.label")) {
 						jnames.add(jfile.getAbsolutePath());
 						break;
 					}
 				}
-
 			}
-
 			if(self && inames.size() <= 1) {
 				Prompt.error("Self-comparison requires directory with at least two files.");
 				return -1;
@@ -479,15 +470,6 @@ public class EzAAI {
 			List<String> ilist = new ArrayList<>(), jlist = new ArrayList<>();
 			List<String> ilabs = new ArrayList<>(), jlabs = new ArrayList<>();
 			File faaDir = new File(tmp + File.separator + GenericConfig.SESSION_UID + "_faa");
-			// skip this since we will use the files in the directories anyway.
-			/*
-			if(!faaDir.exists()) faaDir.mkdirs();
-			else if(!faaDir.isDirectory()) {
-				Prompt.error("Could not create temporary directory for FASTA files.");
-				return -1;
-			}
-
-			 */
 
             for (String s : inames) {
 
@@ -510,7 +492,6 @@ public class EzAAI {
                 BufferedReader br = new BufferedReader(new FileReader(mm_label_file));
                 ilabs.add(br.readLine());
                 br.close();
-                // (new File("mm.label")).delete();
             }
 			for (String s : jnames) {
 
@@ -533,7 +514,6 @@ public class EzAAI {
 				BufferedReader br = new BufferedReader(new FileReader(mm_label_file));
 				jlabs.add(br.readLine());
 				br.close();
-				// (new File("mm.label")).delete();
 			}
 
 			// prepare match output
@@ -580,6 +560,9 @@ public class EzAAI {
 					aaiTable[i][j] = Double.parseDouble(res.get(6));
 					if(ilens[i] == null) ilens[i] = Integer.parseInt(res.get(0));
 					if(jlens[j] == null) jlens[j] = Integer.parseInt(res.get(1));
+
+					System.gc();
+
 				}
 			}
 			if(maw != null) maw.close();

@@ -72,3 +72,9 @@ ezaai cluster -i <AAI_TABLE> -o <OUTPUT>
 |:-:|-----------------|
 |`-i`|Input EzAAI result file containing all-by-all pairwise AAI values|
 |`-o`|Output result file|
+
+### Antialigner modifications:
+
+1. extract -o argument should be an output directory, all files will be written to <GENOME_NAME>/...
+2. calculate -i should be a single folder containing db output files, -o should be the folder containing all database folders
+3. More requested GC runs since there is a memory leak somewhere
