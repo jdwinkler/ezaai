@@ -418,33 +418,71 @@ public class EzAAI {
 			}
 			// prepare profiles
 			File ifile = new File(input1), jfile = new File(input2);
-			String[] inames, jnames;
-			if(ifile.isDirectory()) {
-				String[] ls = ifile.list();
-				assert ls != null;
-				inames = new String[ls.length];
-				for(int i = 0; i < ls.length; i++) {
-					inames[i] = ifile.getAbsolutePath() + File.separator + ls[i];
+			ArrayList<String> inames, jnames;
+			assert ifile.isDirectory();
+			assert jfile.isDirectory();
+			String[] ls = ifile.list();
+			assert ls != null;
+			inames = new ArrayList<String>();
+			for (String l : ls) {
+				// algo change: we only want directories with the mm.label file inside
+				// this allows us to avoid weird file access / race conditions.
+
+				File idir = new File(ifile + File.separator + l);
+				if (idir.isDirectory()) {
+					// we were given a directory with a set of directories containing databases
+					String[] subdir_list = idir.list();
+					assert subdir_list != null;
+					for (String filename : subdir_list) {
+						if (filename.equals("mm.label")) {
+							inames.add(ifile.getAbsolutePath() + File.separator + l);
+							break;
+						}
+					}
+				} else {
+					// we were given a directory with a database inside
+					if (l.equals("mm.label")) {
+						inames.add(ifile.getAbsolutePath() + File.separator + l);
+						break;
+					}
 				}
 			}
-			else {
-				inames = new String[1];
-				inames[0] = ifile.getAbsolutePath();
-			}
-			if(jfile.isDirectory()) {
-				String[] ls = jfile.list();
-				assert ls != null;
-				jnames = new String[ls.length];
-				for(int i = 0; i < ls.length; i++) {
-					jnames[i] = jfile.getAbsolutePath() + File.separator + ls[i];
+			String[] jls = jfile.list();
+			assert jls != null;
+			jnames = new ArrayList<String>();
+			for (String l : jls) {
+
+				File jdir = new File(jfile + File.separator + l);
+				if (jdir.isDirectory()) {
+					// we were given a directory with a set of directories containing databases
+					String[] subdir_list = jdir.list();
+					assert subdir_list != null;
+					for (String filename : subdir_list) {
+						if (filename.equals("mm.label")) {
+							jnames.add(ifile.getAbsolutePath() + File.separator + l);
+							break;
+						}
+					}
+				} else {
+					// we were given a directory with a database inside
+					if (l.equals("mm.label")) {
+						jnames.add(ifile.getAbsolutePath() + File.separator + l);
+						break;
+					}
 				}
-			}
-			else {
-				jnames = new String[1];
-				jnames[0] = jfile.getAbsolutePath();
+
 			}
 
-			if(self && inames.length <= 1) {
+			String[] inames_array = new String[inames.size()];
+			String[] jnames_array = new String[jnames.size()];
+			for (int i = 0; i < inames_array.length; i++){
+				inames_array[i] = inames.get(i);
+			}
+			for (int j = 0; j < jnames_array.length; j++){
+				jnames_array[j] = jnames.get(j);
+			}
+
+			if(self && inames_array.length <= 1) {
 				Prompt.error("Self-comparison requires directory with at least two files.");
 				return -1;
 			}
@@ -453,31 +491,59 @@ public class EzAAI {
 			List<String> ilist = new ArrayList<>(), jlist = new ArrayList<>();
 			List<String> ilabs = new ArrayList<>(), jlabs = new ArrayList<>();
 			File faaDir = new File(tmp + File.separator + GenericConfig.SESSION_UID + "_faa");
+			// skip this since we will use the files in the directories anyway.
+			/*
 			if(!faaDir.exists()) faaDir.mkdirs();
 			else if(!faaDir.isDirectory()) {
 				Prompt.error("Could not create temporary directory for FASTA files.");
 				return -1;
 			}
-			
-			for(int i = 0 ; i < inames.length; i++) {
-				String faaPath = faaDir + File.separator + "i" + i + ".faa";
-				if(dbToFaa(inames[i], faaPath) < 0) return -1;
-				ilist.add(faaPath);
-				
-				BufferedReader br = new BufferedReader(new FileReader("mm.label"));
-				ilabs.add(br.readLine());
-				br.close();
-				(new File("mm.label")).delete();
-			}
-			for(int j = 0 ; j < jnames.length; j++) {
-				String faaPath = faaDir + File.separator + "j" + j + ".faa";
-				if(dbToFaa(jnames[j], faaPath) < 0) return -1;
+
+			 */
+
+            for (String s : inames_array) {
+
+                File idir = new File(s);
+                assert idir.isDirectory();
+                String[] idb_ls = idir.list();
+                assert idb_ls != null;
+                String faaPath = null;
+                for (String fp : idb_ls) {
+                    if (fp.contains(".faa")) {
+                        faaPath = s + File.separator + fp;
+                    }
+                }
+                assert faaPath != null;
+                ilist.add(faaPath);
+                String mm_label_file = idir + File.separator + "mm.label";
+                assert new File(mm_label_file).exists();
+
+                BufferedReader br = new BufferedReader(new FileReader(mm_label_file));
+                ilabs.add(br.readLine());
+                br.close();
+                // (new File("mm.label")).delete();
+            }
+			for (String s : jnames_array) {
+
+				File jdir = new File(s);
+				assert jdir.isDirectory();
+				String[] jdb_ls = jdir.list();
+				assert jdb_ls != null;
+				String faaPath = null;
+				for (String fp : jdb_ls) {
+					if (fp.contains(".faa")) {
+						faaPath = s + File.separator + fp;
+					}
+				}
+				assert faaPath != null;
 				jlist.add(faaPath);
-				
-				BufferedReader br = new BufferedReader(new FileReader("mm.label"));
+				String mm_label_file = jdir + File.separator + "mm.label";
+				assert new File(mm_label_file).exists();
+
+				BufferedReader br = new BufferedReader(new FileReader(mm_label_file));
 				jlabs.add(br.readLine());
 				br.close();
-				(new File("mm.label")).delete();
+				// (new File("mm.label")).delete();
 			}
 
 			// prepare match output
