@@ -20,6 +20,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Random;
 import java.util.Map;
@@ -111,10 +112,10 @@ public class EzAAI {
 		else {
 			output = arg.get("-o");
 			if((new File(output)).exists()) {
-				if((new File(output)).isDirectory()) {
-					Prompt.error("Given output file exists and is a directory: " + output);
-					return -1;
-				}
+//				if((new File(output)).isDirectory()) {
+//					Prompt.error("Given output file exists and is a directory: " + output);
+//					return -1;
+//				}
 				outExists = true;
 				if(module == MODULE_CALCULATE) Prompt.warning("Output file exists. Results will be appended.");
 				else Prompt.warning("Output file exists. Results will be overwritten.");
@@ -278,21 +279,29 @@ public class EzAAI {
 		
 		Prompt.print("Converting given CDS file into protein database... ("+input1+" -> "+output+")");
 		String hex = Long.toHexString(new Random().nextLong());
-		String faaPath = tmp + File.separator + hex + ".faa";
+		String faaPath = input1; // tmp + File.separator + hex + ".faa";
+
+		if (new File(output + File.separator + "mm.label").exists())
+		{
+			Prompt.print("Output for convert module already exists, exiting");
+			return 0;
+		}
 		
 		try {
 			// copy input to temporary directory, translate if seq type is nucleotide
-			if(seqNucl) Prompt.talk("Translating nucleotide sequences into protein sequences...");
-			
-			BufferedWriter bw = new BufferedWriter(new FileWriter(faaPath));
-			List<DnaSeqDomain> seqs = FastSeqLoader.importFileToDomainList(input1);
-			for(DnaSeqDomain seq : seqs) {
-				String title = seq.getTitle();
-				String dna = seq.getSequence();
-				String prot = seqNucl ? Seqtools.translate_CDS(dna, 11, true) : dna;
-				bw.write(String.format(">ezaai_%s # %d # %d\n%s\n", title.split("\\s+")[0], 1, prot.length()*3 + 3, prot));
-			}
-			bw.close();
+			/*
+				if(seqNucl) Prompt.talk("Translating nucleotide sequences into protein sequences...");
+
+				BufferedWriter bw = new BufferedWriter(new FileWriter(faaPath));
+				List<DnaSeqDomain> seqs = FastSeqLoader.importFileToDomainList(input1);
+				for(DnaSeqDomain seq : seqs) {
+					String title = seq.getTitle();
+					String dna = seq.getSequence();
+					String prot = seqNucl ? Seqtools.translate_CDS(dna, 11, true) : dna;
+					bw.write(String.format(">ezaai_%s # %d # %d\n%s\n", title.split("\\s+")[0], 1, prot.length()*3 + 3, prot));
+				}
+				bw.close();
+			 */
 			
 			// create databases
 			// TODO use proper temp file directory creation
@@ -307,7 +316,7 @@ public class EzAAI {
 			
 			// create label info file
 			Prompt.debug("Writing file mm.label");
-			bw = new BufferedWriter(new FileWriter(dir + File.separator + "mm.label"));
+			BufferedWriter bw = new BufferedWriter(new FileWriter(dir + File.separator + "mm.label"));
 			bw.write(label + "\n");
 			bw.close();
 			
@@ -317,8 +326,8 @@ public class EzAAI {
 			// StringBuilder buf = new StringBuilder("tar -c -z -f " + "mm.tar.gz");
 			for(String name : names)
 			{
-				// JW modification-just save all of the files without any deletion etc.
-				Shell.exec("mv " + name + " " + output + File.separator + name);
+				// JW modification-just save all of the files without any deletion etc
+				Shell.exec("mv " + dir + File.separator + name + " " + output + File.separator + name);
 				// buf.append(" ").append(name);
 			}
 			// Shell.exec(buf.toString(), new File(dir));
@@ -343,10 +352,17 @@ public class EzAAI {
 	
 	private int runExtract() {
 		Prompt.debug("EzAAI - extract module");
+		String inputName = new File(input1).getName();
+		File parentDirectory = new File(output + File.separator + inputName);
+		if(!parentDirectory.exists() && !parentDirectory.mkdirs()){
+			return -1;
+		}
 		String  gffFile = tmp + File.separator + GenericConfig.SESSION_UID + ".gff",
-				faaFile = output + File.separator + input1 + ".faa",
+				faaFile = output + File.separator + inputName + File.separator + inputName + ".faa",
 				ffnFile = tmp + File.separator + GenericConfig.SESSION_UID + ".ffn";
-		
+		Prompt.print(gffFile);
+		Prompt.print(faaFile);
+		Prompt.print(ffnFile);
 		try {
 			Prompt.print("Running prodigal on genome " + input1 + "...");
 			if(multithread) {
@@ -364,7 +380,7 @@ public class EzAAI {
 			}
 			Prompt.talk("EzAAI", "Creating a submodule for converting .faa into .db...");
 			EzAAI convertModule = new EzAAI("convert");
-			String[] convertArgs = {"convert", "-i", faaFile, "-s", "prot", "-o", output, "-l", label, "-m", path_mmseqs, "-tmp", tmp};
+			String[] convertArgs = {"convert", "-i", faaFile, "-s", "prot", "-o", parentDirectory.getAbsolutePath(), "-l", label, "-m", path_mmseqs, "-tmp", tmp};
 			if(convertModule.run(convertArgs) < 0) return -1;
 			
 			(new File(gffFile)).delete();
